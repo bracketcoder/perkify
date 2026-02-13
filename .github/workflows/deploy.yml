@@ -1,0 +1,82 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+          FERNET_KEY: ${{ secrets.FERNET_KEY }}
+          ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
+          CSRF_TRUSTED_ORIGINS: ${{ secrets.CSRF_TRUSTED_ORIGINS }}
+          CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          envs: DJANGO_SECRET_KEY,FERNET_KEY,ALLOWED_HOSTS,CSRF_TRUSTED_ORIGINS,CORS_ALLOWED_ORIGINS,FRONTEND_URL,SENDGRID_API_KEY,OPENAI_API_KEY
+          script: |
+            set -e
+
+            APP_DIR=/opt/perkify
+            REPO_URL=https://github.com/bracketcoder/perkify.git
+
+            # ── Pull latest code ──
+            if [ -d "$APP_DIR" ]; then
+              cd $APP_DIR && git pull origin main
+            else
+              git clone $REPO_URL $APP_DIR
+              cd $APP_DIR
+            fi
+
+            # ── Backend ──
+            cd $APP_DIR/backend
+
+            if [ ! -d "venv" ]; then
+              python3 -m venv venv
+            fi
+            source venv/bin/activate
+
+            # Write .env from forwarded environment variables
+            cat > .env << EOF
+            DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+            DEBUG=False
+            FERNET_KEY=${FERNET_KEY}
+            ALLOWED_HOSTS=${ALLOWED_HOSTS}
+            CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
+            CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+            FRONTEND_URL=${FRONTEND_URL}
+            SENDGRID_API_KEY=${SENDGRID_API_KEY}
+            DEFAULT_FROM_EMAIL=info@perkifys.com
+            REPLY_TO_EMAIL=support@perkifys.com
+            OPENAI_API_KEY=${OPENAI_API_KEY}
+            EOF
+            sed -i 's/^            //' .env
+
+            pip install -r requirements.txt --quiet
+            mkdir -p logs
+            python manage.py migrate --noinput
+            python manage.py collectstatic --noinput
+
+            # ── Frontend ──
+            cd $APP_DIR/frontend
+            echo "BACKEND_URL=http://127.0.0.1:8000" > .env.local
+
+            npm ci --legacy-peer-deps
+            npm run build
+
+            # ── Restart services ──
+            sudo systemctl restart perkify-backend
+            sudo systemctl restart perkify-frontend
+            sudo systemctl reload nginx
+
+            echo "Deployment complete!"

@@ -1,0 +1,43 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+task.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+venv/
+*.egg-info/
+
+# Django
+backend/db.sqlite3
+backend/media/
+backend/logs/*.log
+backend/staticfiles/
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Screenshots / reference images (root level only)
+/*.png
+
+# Debug logs
+firebase-debug.log
+npm-debug.log*
+
+# Playwright MCP logs
+.playwright-mcp/
+
+# Claude
+.claude/
