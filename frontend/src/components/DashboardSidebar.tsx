@@ -133,7 +133,7 @@ export default function DashboardSidebar() {
 
   const getBalance = () => {
     if (!profile) return "$0.00";
-    return `$${parseFloat(profile.wallet_balance || "0").toFixed(2)}`;
+    return `$${parseFloat(String(profile.wallet_balance || "0")).toFixed(2)}`;
   };
 
   // Inject notification badge count dynamically
