@@ -157,7 +157,7 @@ export default function AddGiftCardPage() {
       }
 
       const token = localStorage.getItem("access_token");
-      const res = await fetch("http://localhost:8000/api/gift-cards/", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/gift-cards/`, {
         method: "POST",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),

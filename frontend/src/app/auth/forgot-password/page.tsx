@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");

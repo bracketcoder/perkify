@@ -1,4 +1,6 @@
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL}/api`
+  : "/api";
 
 export const apiCall = async (url: string, options: RequestInit = {}) => {
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
