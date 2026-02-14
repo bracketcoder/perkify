@@ -8,6 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from core.api.throttles import AuthRateThrottle
 from core.emails import send_password_reset_email, send_verification_email
 from core.models import User
+from core.turnstile import verify_turnstile
 from core.api.serializers.auth import (
     ChangePasswordSerializer,
     LoginSerializer,
@@ -33,6 +34,15 @@ class RegisterView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        # Verify Turnstile token
+        turnstile_token = serializer.validated_data.get("turnstile_token", "")
+        if not verify_turnstile(turnstile_token, request.META.get("REMOTE_ADDR")):
+            return Response(
+                {"detail": "Bot verification failed. Please try again."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         user = serializer.save()
 
         # Send OTP email
@@ -61,6 +71,15 @@ class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        # Verify Turnstile token
+        turnstile_token = serializer.validated_data.get("turnstile_token", "")
+        if not verify_turnstile(turnstile_token, request.META.get("REMOTE_ADDR")):
+            return Response(
+                {"detail": "Bot verification failed. Please try again."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         user = serializer.validated_data["user"]
         tokens = RefreshToken.for_user(user)
         return Response(

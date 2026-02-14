@@ -9,6 +9,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True)
+    turnstile_token = serializers.CharField(write_only=True, required=True)
 
     class Meta:
         model = User
@@ -19,6 +20,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             "password_confirm",
             "first_name",
             "last_name",
+            "turnstile_token",
         ]
 
     def validate_email(self, value):
@@ -36,6 +38,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("password_confirm")
+        validated_data.pop("turnstile_token", None)
         password = validated_data.pop("password")
         user = User(role=User.Role.USER, **validated_data)
         user.set_password(password)
@@ -48,6 +51,7 @@ class LoginSerializer(serializers.Serializer):
 
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+    turnstile_token = serializers.CharField(write_only=True, required=True)
 
     def validate(self, attrs):
         email = attrs["email"].lower()

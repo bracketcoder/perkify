@@ -1,8 +1,11 @@
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.forms import AuthenticationForm
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import display
 
+from .turnstile import verify_turnstile
 from .models import (
     AuditLog,
     Brand,
@@ -19,6 +22,29 @@ from .models import (
     Trade,
     User,
 )
+
+
+# ─── Turnstile Admin Login ───
+class TurnstileAdminAuthForm(AuthenticationForm):
+    cf_turnstile_response = forms.CharField(
+        widget=forms.HiddenInput, required=True
+    )
+
+    def clean(self):
+        token = self.cleaned_data.get("cf_turnstile_response", "")
+        ip = (
+            self.request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
+            or self.request.META.get("REMOTE_ADDR")
+            if self.request
+            else None
+        )
+        if not verify_turnstile(token, ip):
+            raise forms.ValidationError("Bot verification failed. Please try again.")
+        return super().clean()
+
+
+admin.site.login_form = TurnstileAdminAuthForm
+admin.site.login_template = "admin/login.html"
 
 
 # ─── Inlines ───

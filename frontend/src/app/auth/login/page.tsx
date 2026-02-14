@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Script from "next/script";
 import { Eye, EyeOff, Mail, Lock, ArrowRight, AlertCircle } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const TURNSTILE_SITE_KEY = "0x4AAAAAACcbrWuiO2lrJOCd";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +17,39 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const turnstileRef = useRef<string | null>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  const onTurnstileLoad = useCallback(() => {
+    if (typeof window !== "undefined" && window.turnstile) {
+      widgetIdRef.current = window.turnstile.render("#turnstile-container", {
+        sitekey: TURNSTILE_SITE_KEY,
+        size: "invisible",
+        callback: (token: string) => {
+          turnstileRef.current = token;
+        },
+      });
+    }
+  }, []);
+
+  const getTurnstileToken = (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!window.turnstile || widgetIdRef.current === null) {
+        reject(new Error("Turnstile not loaded"));
+        return;
+      }
+      // Reset and execute to get a fresh token
+      window.turnstile.reset(widgetIdRef.current);
+      window.turnstile.execute(widgetIdRef.current, {
+        callback: (token: string) => {
+          resolve(token);
+        },
+        "error-callback": () => {
+          reject(new Error("Bot verification failed. Please try again."));
+        },
+      });
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,10 +57,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      const turnstileToken = await getTurnstileToken();
+
       const res = await fetch(`${API_BASE}/api/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, turnstile_token: turnstileToken }),
       });
 
       const data = await res.json();
@@ -53,6 +90,17 @@ export default function LoginPage() {
 
   return (
     <section className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-primary-50/30 px-4 py-12">
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad"
+        strategy="afterInteractive"
+        onReady={() => {
+          (window as any).onTurnstileLoad = onTurnstileLoad;
+          // If turnstile already loaded before onReady
+          if (window.turnstile) onTurnstileLoad();
+        }}
+      />
+      <div id="turnstile-container" />
+
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">

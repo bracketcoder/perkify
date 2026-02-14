@@ -81,6 +81,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "core.context_processors.turnstile_context",
             ],
         },
     },
@@ -379,3 +380,7 @@ REPLY_TO_EMAIL = os.getenv("REPLY_TO_EMAIL", "support@perkifys.com")
 
 # ─── OpenAI ───
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+# ─── Cloudflare Turnstile ───
+TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY", "0x4AAAAAACcbrWuiO2lrJOCd")
+TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "0x4AAAAAACcbrYI74zDNkQz3RJX64bQ2CzE")

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import {
   Eye,
   EyeOff,
@@ -16,6 +17,7 @@ import {
 import Image from "next/image";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const TURNSTILE_SITE_KEY = "0x4AAAAAACcbrWuiO2lrJOCd";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -29,6 +31,35 @@ export default function RegisterPage() {
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const widgetIdRef = useRef<string | null>(null);
+
+  const onTurnstileLoad = useCallback(() => {
+    if (typeof window !== "undefined" && window.turnstile) {
+      widgetIdRef.current = window.turnstile.render("#turnstile-container", {
+        sitekey: TURNSTILE_SITE_KEY,
+        size: "invisible",
+        callback: () => {},
+      });
+    }
+  }, []);
+
+  const getTurnstileToken = (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!window.turnstile || widgetIdRef.current === null) {
+        reject(new Error("Turnstile not loaded"));
+        return;
+      }
+      window.turnstile.reset(widgetIdRef.current);
+      window.turnstile.execute(widgetIdRef.current, {
+        callback: (token: string) => {
+          resolve(token);
+        },
+        "error-callback": () => {
+          reject(new Error("Bot verification failed. Please try again."));
+        },
+      });
+    });
+  };
 
   const passwordChecks = [
     { label: "At least 8 characters", met: password.length >= 8 },
@@ -57,6 +88,8 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      const turnstileToken = await getTurnstileToken();
+
       const res = await fetch(`${API_BASE}/api/auth/register/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,6 +100,7 @@ export default function RegisterPage() {
           password_confirm: confirmPassword,
           first_name: firstName,
           last_name: lastName,
+          turnstile_token: turnstileToken,
         }),
       });
 
@@ -103,6 +137,16 @@ export default function RegisterPage() {
 
   return (
     <section className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-primary-50/30 px-4 py-12">
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad"
+        strategy="afterInteractive"
+        onReady={() => {
+          (window as any).onTurnstileLoad = onTurnstileLoad;
+          if (window.turnstile) onTurnstileLoad();
+        }}
+      />
+      <div id="turnstile-container" />
+
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
