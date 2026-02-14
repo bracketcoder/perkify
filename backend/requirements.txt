@@ -6,6 +6,7 @@ cffi==2.0.0
 cryptography==46.0.5
 distro==1.9.0
 Django==6.0.2
+django-anymail[sendgrid]==14.0
 django-cors-headers==4.9.0
 django-filter==25.2
 django-unfold==0.79.0
