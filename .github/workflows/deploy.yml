@@ -74,6 +74,10 @@ jobs:
             npm ci --legacy-peer-deps
             npm run build
 
+            # Copy public assets into standalone build (Next.js standalone doesn't include these)
+            cp -r public .next/standalone/public
+            cp -r .next/static .next/standalone/.next/static
+
             # ── Restart services ──
             sudo systemctl restart perkify-backend
             sudo systemctl restart perkify-frontend
