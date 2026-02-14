@@ -1,23 +1,26 @@
 """
 Centralized email sending for Perkify.
-Uses Django's email framework backed by SendGrid SMTP.
+Uses Django's email framework backed by SendGrid Web API.
 """
 
 import logging
+import random
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import EmailMultiAlternatives
+from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
 logger = logging.getLogger("core")
 
-FRONTEND_URL = "http://localhost:3000"
+FRONTEND_URL = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
 
 
 def _send(subject, text_body, html_body, to_email):
-    """Send an email via SendGrid SMTP relay."""
+    """Send an email via SendGrid Web API."""
     msg = EmailMultiAlternatives(
         subject=subject,
         body=text_body,
@@ -33,21 +36,28 @@ def _send(subject, text_body, html_body, to_email):
         logger.error("Failed to send email to %s: %s", to_email, exc)
 
 
+def generate_otp(user):
+    """Generate a 6-digit OTP and store it on the user with a 10-minute expiry."""
+    otp = f"{random.randint(0, 999999):06d}"
+    user.otp_code = otp
+    user.otp_expires_at = timezone.now() + timedelta(minutes=10)
+    user.save(update_fields=["otp_code", "otp_expires_at"])
+    return otp
+
+
 def send_verification_email(user):
-    """Send email verification link after registration."""
-    uid = urlsafe_base64_encode(force_bytes(user.pk))
-    token = default_token_generator.make_token(user)
-    verification_token = f"{uid}:{token}"
-    verify_url = f"{FRONTEND_URL}/auth/verify-email?token={verification_token}"
+    """Send a 6-digit OTP code via email for account verification."""
+    otp = generate_otp(user)
 
     subject = "Verify your Perkify account"
 
     text_body = (
         f"Hi {user.first_name or user.username},\n\n"
-        f"Welcome to Perkify! Please verify your email address by clicking the link below:\n\n"
-        f"{verify_url}\n\n"
-        f"Or paste this token manually: {verification_token}\n\n"
-        f"This link expires in 24 hours.\n\n"
+        f"Welcome to Perkify! Your verification code is:\n\n"
+        f"    {otp}\n\n"
+        f"Enter this code on the verification page to complete your registration.\n"
+        f"This code expires in 10 minutes.\n\n"
+        f"If you didn't create a Perkify account, you can ignore this email.\n\n"
         f"— The Perkify Team"
     )
 
@@ -59,17 +69,20 @@ def send_verification_email(user):
         <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 32px;">
             <h2 style="color: #111827; font-size: 22px; margin: 0 0 8px;">Welcome, {user.first_name or user.username}!</h2>
             <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
-                Thanks for signing up for Perkify. Please verify your email address to start swapping and selling gift cards.
+                Thanks for signing up for Perkify. Use the code below to verify your email address.
             </p>
             <div style="text-align: center; margin: 24px 0;">
-                <a href="{verify_url}"
-                   style="display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none;
-                          padding: 14px 32px; border-radius: 10px; font-weight: 600; font-size: 15px;">
-                    Verify Email Address
-                </a>
+                <div style="display: inline-block; background: #f0fdf4; border: 2px solid #16a34a;
+                            border-radius: 12px; padding: 16px 32px; letter-spacing: 8px;
+                            font-size: 32px; font-weight: 700; color: #16a34a; font-family: monospace;">
+                    {otp}
+                </div>
             </div>
+            <p style="color: #6b7280; font-size: 13px; text-align: center; margin: 16px 0 0;">
+                This code expires in <strong>10 minutes</strong>.
+            </p>
             <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 24px 0 0;">
-                This link expires in 24 hours. If you didn't create a Perkify account, you can ignore this email.
+                If you didn't create a Perkify account, you can ignore this email.
             </p>
         </div>
         <p style="color: #9ca3af; font-size: 11px; text-align: center; margin-top: 24px;">

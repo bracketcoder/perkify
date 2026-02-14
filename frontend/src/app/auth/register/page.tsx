@@ -88,17 +88,8 @@ export default function RegisterPage() {
         throw new Error(messages.join(" ") || "Registration failed.");
       }
 
-      // Store tokens (API returns { tokens: { access, refresh } })
-      const tokens = data.tokens || data;
-      if (tokens.access) localStorage.setItem("access_token", tokens.access);
-      if (tokens.refresh) localStorage.setItem("refresh_token", tokens.refresh);
-
-      // If tokens provided, go to dashboard; otherwise go to verify email
-      if (tokens.access) {
-        router.push("/dashboard");
-      } else {
-        router.push("/auth/verify-email");
-      }
+      // Redirect to OTP verification page with email
+      router.push(`/auth/verify-email?email=${encodeURIComponent(email)}`);
     } catch (err) {
       setError(
         err instanceof Error

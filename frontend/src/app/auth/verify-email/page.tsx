@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -18,22 +18,60 @@ function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [token, setToken] = useState("");
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resent, setResent] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Auto-read token from URL query parameter
+  const email = searchParams.get("email") || "";
+
+  // Cooldown timer for resend
   useEffect(() => {
-    const urlToken = searchParams.get("token");
-    if (urlToken) {
-      setToken(urlToken);
-      verifyToken(urlToken);
-    }
-  }, [searchParams]);
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
 
-  const verifyToken = async (verificationToken: string) => {
+  const handleChange = (index: number, value: string) => {
+    // Only allow digits
+    if (value && !/^\d$/.test(value)) return;
+
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+
+    // Auto-submit when all 6 digits are entered
+    if (value && index === 5 && newOtp.every((d) => d !== "")) {
+      verifyOtp(newOtp.join(""));
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (pasted.length === 6) {
+      const newOtp = pasted.split("");
+      setOtp(newOtp);
+      inputRefs.current[5]?.focus();
+      verifyOtp(pasted);
+    }
+  };
+
+  const verifyOtp = async (code: string) => {
     setError("");
     setLoading(true);
 
@@ -41,29 +79,29 @@ function VerifyEmailContent() {
       const res = await fetch(`${API_BASE}/api/auth/verify-email/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: verificationToken }),
+        body: JSON.stringify({ email, otp: code }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(
-          data.detail || data.error || "Verification failed. Invalid or expired token."
-        );
+        throw new Error(data.detail || "Verification failed.");
       }
 
       setVerified(true);
 
-      // Store tokens if returned
-      if (data.access) localStorage.setItem("access_token", data.access);
-      if (data.refresh) localStorage.setItem("refresh_token", data.refresh);
-      if (data.token) localStorage.setItem("access_token", data.token);
+      // Store tokens returned after successful verification
+      if (data.tokens) {
+        localStorage.setItem("access_token", data.tokens.access);
+        localStorage.setItem("refresh_token", data.tokens.refresh);
+      }
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Verification failed. Please try again."
+        err instanceof Error ? err.message : "Verification failed. Please try again."
       );
+      // Clear OTP inputs on error
+      setOtp(["", "", "", "", "", ""]);
+      inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
     }
@@ -71,31 +109,45 @@ function VerifyEmailContent() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (token.trim()) {
-      verifyToken(token.trim());
+    const code = otp.join("");
+    if (code.length === 6) {
+      verifyOtp(code);
     }
   };
 
   const handleResend = async () => {
-    const accessToken = localStorage.getItem("access_token");
-    if (!accessToken) {
-      setError("Please log in first to resend the verification email.");
-      return;
-    }
+    if (cooldown > 0) return;
+
     try {
-      await fetch(`${API_BASE}/api/auth/resend-verification/`, {
+      const res = await fetch(`${API_BASE}/api/auth/resend-verification/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
       });
-      setResent(true);
-      setTimeout(() => setResent(false), 3000);
+
+      if (res.ok) {
+        setResent(true);
+        setCooldown(60);
+        setTimeout(() => setResent(false), 3000);
+      }
     } catch {
-      setError("Failed to resend verification email.");
+      setError("Failed to resend verification code.");
     }
   };
+
+  // Redirect if no email
+  if (!email) {
+    return (
+      <section className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-primary-50/30 px-4 py-12">
+        <div className="w-full max-w-md text-center">
+          <p className="text-gray-500 mb-4">No email address provided.</p>
+          <Link href="/auth/register" className="btn-primary inline-flex py-3 px-6">
+            Go to Registration
+          </Link>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-primary-50/30 px-4 py-12">
@@ -122,8 +174,10 @@ function VerifyEmailContent() {
                   Verify Your Email
                 </h1>
                 <p className="text-gray-500 text-sm">
-                  Enter the verification token sent to your email address, or
-                  click the link in the email to verify automatically.
+                  We sent a 6-digit code to
+                </p>
+                <p className="text-gray-900 font-medium text-sm mt-1">
+                  {email}
                 </p>
               </div>
 
@@ -139,24 +193,34 @@ function VerifyEmailContent() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Token Input */}
+                {/* OTP Inputs */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Verification Token
+                  <label className="block text-sm font-medium text-gray-700 mb-3 text-center">
+                    Enter verification code
                   </label>
-                  <input
-                    type="text"
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    placeholder="Paste your verification token"
-                    className="input-field text-center"
-                    required
-                  />
+                  <div className="flex justify-center gap-3" onPaste={handlePaste}>
+                    {otp.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={(el) => { inputRefs.current[index] = el; }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleChange(index, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(index, e)}
+                        className="w-12 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl
+                                   focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none
+                                   transition-all duration-200"
+                        disabled={loading}
+                      />
+                    ))}
+                  </div>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={loading || !token.trim()}
+                  disabled={loading || otp.some((d) => !d)}
                   className="btn-primary w-full py-3.5 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {loading ? "Verifying..." : "Verify Email"}
@@ -167,26 +231,33 @@ function VerifyEmailContent() {
               {/* Resend */}
               <div className="text-center mt-6">
                 <p className="text-sm text-gray-500 mb-2">
-                  Didn&apos;t receive the email?
+                  Didn&apos;t receive the code?
                 </p>
                 <button
                   onClick={handleResend}
-                  disabled={resent}
+                  disabled={cooldown > 0}
                   className={`inline-flex items-center gap-2 text-sm font-medium transition-colors ${
                     resent
                       ? "text-green-600"
+                      : cooldown > 0
+                      ? "text-gray-400 cursor-not-allowed"
                       : "text-primary-600 hover:text-primary-700"
                   }`}
                 >
                   {resent ? (
                     <>
                       <CheckCircle2 size={16} />
-                      Email resent!
+                      Code resent!
+                    </>
+                  ) : cooldown > 0 ? (
+                    <>
+                      <RefreshCw size={16} />
+                      Resend in {cooldown}s
                     </>
                   ) : (
                     <>
                       <RefreshCw size={16} />
-                      Resend Email
+                      Resend Code
                     </>
                   )}
                 </button>
@@ -204,8 +275,8 @@ function VerifyEmailContent() {
                 Your account is now verified. You can start swapping and selling
                 gift cards on Perkify.
               </p>
-              <Link href="/auth/login" className="btn-primary w-full py-3.5">
-                Continue to Log In
+              <Link href="/dashboard" className="btn-primary w-full py-3.5">
+                Go to Dashboard
                 <ArrowRight size={18} className="ml-2" />
               </Link>
             </div>

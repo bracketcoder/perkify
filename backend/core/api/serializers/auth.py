@@ -153,6 +153,13 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
 
 class VerifyEmailSerializer(serializers.Serializer):
-    """Accept a verification token (uid:token format)."""
+    """Accept email + 6-digit OTP code for verification."""
 
-    token = serializers.CharField()
+    email = serializers.EmailField()
+    otp = serializers.CharField(min_length=6, max_length=6)
+
+
+class ResendOTPSerializer(serializers.Serializer):
+    """Accept an email address for resending OTP."""
+
+    email = serializers.EmailField()
