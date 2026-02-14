@@ -104,6 +104,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -116,6 +117,9 @@ UNFOLD = {
     "SITE_SUBHEADER": "Gift Card Swap & Sell Platform",
     "SITE_URL": os.getenv("FRONTEND_URL", "http://localhost:3000"),
     "SITE_SYMBOL": "storefront",
+    "SITE_FAVICONS": [
+        {"rel": "icon", "sizes": "32x32", "type": "image/x-icon", "href": lambda request: static("favicon.ico")},
+    ],
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": True,
     "THEME": "light",
