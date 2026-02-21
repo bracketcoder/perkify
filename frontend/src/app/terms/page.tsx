@@ -169,7 +169,38 @@ export default function TermsOfServicePage() {
             </div>
 
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">11. Contact</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">11. User Responsibility &amp; Legal Compliance</h2>
+              <p className="text-gray-600 leading-relaxed mb-4">
+                By using Perkify, you acknowledge and agree that:
+              </p>
+              <ul className="list-disc pl-6 text-gray-600 space-y-2">
+                <li>
+                  You are solely responsible for ensuring that your use of the platform complies with
+                  all applicable local, state, federal, and international laws and regulations.
+                </li>
+                <li>
+                  Any illegal activity conducted through Perkify — including but not limited to fraud,
+                  money laundering, trafficking in stolen goods, or tax evasion — is strictly prohibited
+                  and will be reported to the relevant authorities.
+                </li>
+                <li>
+                  Users who engage in illegal activity are subject to prosecution and punishment under
+                  applicable local, state, federal, and international laws.
+                </li>
+                <li>
+                  Perkify is not responsible for, and shall not be held liable for, any illegal actions
+                  taken by users on or through the platform. Users assume full legal responsibility for
+                  their conduct.
+                </li>
+                <li>
+                  Perkify reserves the right to cooperate fully with law enforcement agencies and to
+                  disclose user information as required by law or legal process.
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">12. Contact</h2>
               <p className="text-gray-600 leading-relaxed">
                 For questions about these Terms of Service, contact us at{" "}
                 <a href="mailto:support@perkify.com" className="text-primary-600 hover:text-primary-700 font-medium">

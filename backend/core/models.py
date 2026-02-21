@@ -59,6 +59,8 @@ class User(AbstractUser):
     daily_trade_reset = models.DateField(null=True, blank=True)
     otp_code = models.CharField(max_length=6, blank=True)
     otp_expires_at = models.DateTimeField(null=True, blank=True)
+    agreed_to_terms = models.BooleanField(default=False)
+    terms_agreed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -226,6 +228,8 @@ class Trade(models.Model):
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.PROPOSED)
     initiator_confirmed = models.BooleanField(default=False)
     responder_confirmed = models.BooleanField(default=False)
+    initiator_paid = models.BooleanField(default=False)
+    responder_paid = models.BooleanField(default=False)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -318,6 +322,48 @@ class EscrowSession(models.Model):
         if self.confirmation_deadline:
             return timezone.now() > self.confirmation_deadline
         return False
+
+
+# ─── Payment ───
+class Payment(models.Model):
+    class PaymentType(models.TextChoices):
+        TRADE_FEE = "trade_fee", "Trade Fee"
+        SALE_PAYMENT = "sale_payment", "Sale Payment"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+        REFUNDED = "refunded", "Refunded"
+
+    payment_id = models.CharField(max_length=30, unique=True, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="payments"
+    )
+    trade = models.ForeignKey(
+        Trade, on_delete=models.SET_NULL, null=True, blank=True, related_name="payments"
+    )
+    sale = models.ForeignKey(
+        "Sale", on_delete=models.SET_NULL, null=True, blank=True, related_name="payments"
+    )
+    payment_type = models.CharField(max_length=15, choices=PaymentType.choices)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    stripe_checkout_session_id = models.CharField(max_length=200, blank=True)
+    stripe_payment_intent_id = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.payment_id:
+            self.payment_id = f"PAY-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.payment_id} – {self.user.username} ${self.amount} ({self.get_status_display()})"
 
 
 # ─── Dispute ───

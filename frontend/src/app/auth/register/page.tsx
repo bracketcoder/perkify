@@ -100,6 +100,7 @@ export default function RegisterPage() {
           password_confirm: confirmPassword,
           first_name: firstName,
           last_name: lastName,
+          agreed_to_terms: agreed,
           turnstile_token: turnstileToken,
         }),
       });
