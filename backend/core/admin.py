@@ -16,6 +16,7 @@ from .models import (
     GiftCard,
     Notification,
     NotificationRule,
+    Payment,
     PlatformSettings,
     Review,
     Sale,
@@ -388,6 +389,30 @@ class EscrowSessionAdmin(ModelAdmin):
             "confirming": "warning",
             "finalized": "success",
             "reversed": "danger",
+        },
+    )
+    def show_status_badge(self, obj):
+        return obj.status
+
+
+# ═══════════════════════════════════════════════
+#  Payment Tracking
+# ═══════════════════════════════════════════════
+@admin.register(Payment)
+class PaymentAdmin(ModelAdmin):
+    list_display = ("payment_id", "user", "payment_type", "amount", "show_status_badge", "created_at")
+    list_filter = ("status", "payment_type")
+    search_fields = ("payment_id", "user__username", "stripe_checkout_session_id", "stripe_payment_intent_id")
+    list_per_page = 25
+    readonly_fields = ("payment_id", "created_at", "updated_at")
+
+    @display(
+        description="Status",
+        label={
+            "pending": "warning",
+            "completed": "success",
+            "failed": "danger",
+            "refunded": "info",
         },
     )
     def show_status_badge(self, obj):

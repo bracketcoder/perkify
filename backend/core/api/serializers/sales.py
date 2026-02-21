@@ -7,14 +7,14 @@ from core.models import GiftCard, Sale
 
 
 class SaleGiftCardSerializer(serializers.ModelSerializer):
-    brand_name = serializers.CharField(source="brand.name", read_only=True)
+    brand = serializers.CharField(source="brand.name", read_only=True)
     owner_username = serializers.CharField(source="owner.username", read_only=True)
 
     class Meta:
         model = GiftCard
         fields = [
             "id",
-            "brand_name",
+            "brand",
             "owner_username",
             "value",
             "selling_price",
@@ -99,6 +99,13 @@ class SaleCreateSerializer(serializers.Serializer):
         request = self.context["request"]
         user = request.user
         gift_card = attrs["gift_card"]
+
+        # ── Avatar required ──
+        if not user.avatar:
+            raise serializers.ValidationError(
+                "You must upload a profile image before making purchases. "
+                "Go to your Profile page to add one."
+            )
 
         # ── Trade limit enforcement ──
         user.reset_daily_limits_if_needed()

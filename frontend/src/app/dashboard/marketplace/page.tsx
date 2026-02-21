@@ -56,7 +56,19 @@ function GiftCardCard({ card }: { card: GiftCard }) {
       });
       if (res.ok) {
         const data = await res.json();
-        router.push(`/dashboard/sales/${data.sale_id}`);
+        // Create Stripe checkout session for payment
+        const payRes = await apiCall(`payments/sale/${data.sale_id}/checkout/`, {
+          method: "POST",
+        });
+        if (payRes.ok) {
+          const payData = await payRes.json();
+          if (payData.checkout_url) {
+            window.location.href = payData.checkout_url;
+            return;
+          }
+        }
+        // Fallback: redirect to transactions if payment not available
+        router.push(`/dashboard/transactions`);
       } else {
         const data = await res.json().catch(() => null);
         const msg = data?.detail || data?.non_field_errors?.[0] || data?.gift_card_id?.[0] || data?.gift_card?.[0] || "Failed to complete purchase.";

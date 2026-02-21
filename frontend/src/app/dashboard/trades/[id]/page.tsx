@@ -22,6 +22,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   Flag,
+  CreditCard,
+  DollarSign,
 } from "lucide-react";
 import { apiCall } from "@/lib/api";
 
@@ -57,6 +59,9 @@ interface TradeDetail {
   platform_fee: number;
   is_initiator: boolean;
   is_responder: boolean;
+  my_fee_paid: boolean;
+  initiator_paid: boolean;
+  responder_paid: boolean;
   confirmation_deadline?: string;
   created_at: string;
   updated_at: string;
@@ -645,63 +650,127 @@ export default function TradeDetailPage() {
           Actions
         </h3>
 
-        {/* Proposed — Responder actions */}
-        {trade.status === "proposed" && trade.is_responder && (
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() =>
-                handleAction(
-                  "accept",
-                  "PATCH",
-                  `trades/${tradeId}/respond/`,
-                  { action: "accept" }
-                )
-              }
-              disabled={actionLoading !== null}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-600 text-white text-sm font-semibold rounded-xl hover:bg-primary-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {actionLoading === "accept" ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <ThumbsUp size={16} />
-              )}
-              Accept Trade
-            </button>
-            <button
-              onClick={() =>
-                handleAction(
-                  "decline",
-                  "PATCH",
-                  `trades/${tradeId}/respond/`,
-                  { action: "decline" }
-                )
-              }
-              disabled={actionLoading !== null}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-100 border border-red-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {actionLoading === "decline" ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <ThumbsDown size={16} />
-              )}
-              Decline Trade
-            </button>
-          </div>
-        )}
-
-        {/* Proposed — Initiator sees "waiting" */}
-        {trade.status === "proposed" && trade.is_initiator && (
-          <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-            <Clock size={20} className="text-blue-500" />
-            <div>
-              <div className="text-sm font-semibold text-blue-800">
-                Waiting for Response
+        {/* Proposed — Pay Fee & Actions */}
+        {trade.status === "proposed" && (
+          <div className="space-y-4">
+            {/* Fee Payment Status */}
+            <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl">
+              <div className="flex items-center gap-2 mb-3">
+                <DollarSign size={18} className="text-primary-600" />
+                <span className="text-sm font-semibold text-gray-900">Platform Fee Payment</span>
               </div>
-              <div className="text-xs text-blue-600">
-                Your trade offer has been sent. Waiting for{" "}
-                {trade.responder.username} to accept or decline.
+              <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${trade.initiator_paid ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>
+                  {trade.initiator_paid ? <CheckCircle2 size={14} /> : <Clock size={14} />}
+                  {trade.initiator.username}: {trade.initiator_paid ? "Paid" : "Pending"}
+                </div>
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${trade.responder_paid ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>
+                  {trade.responder_paid ? <CheckCircle2 size={14} /> : <Clock size={14} />}
+                  {trade.responder.username}: {trade.responder_paid ? "Paid" : "Pending"}
+                </div>
               </div>
             </div>
+
+            {/* Pay Fee Button (if not paid yet) */}
+            {!trade.my_fee_paid && (
+              <button
+                onClick={async () => {
+                  try {
+                    setActionLoading("pay");
+                    const res = await apiCall(`payments/trade/${tradeId}/checkout/`, { method: "POST" });
+                    if (!res.ok) {
+                      const errData = await res.json().catch(() => ({}));
+                      throw new Error(errData.detail || "Failed to create payment session");
+                    }
+                    const data = await res.json();
+                    if (data.checkout_url) {
+                      window.location.href = data.checkout_url;
+                    }
+                  } catch (err: unknown) {
+                    alert(err instanceof Error ? err.message : "Payment failed");
+                  } finally {
+                    setActionLoading(null);
+                  }
+                }}
+                disabled={actionLoading !== null}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white text-sm font-semibold rounded-xl hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {actionLoading === "pay" ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <CreditCard size={16} />
+                )}
+                Pay Fee (${myFee?.toFixed(2) ?? "0.00"})
+              </button>
+            )}
+
+            {/* Fee Already Paid Confirmation */}
+            {trade.my_fee_paid && (
+              <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-xl">
+                <CheckCircle2 size={18} className="text-green-500" />
+                <span className="text-sm font-semibold text-green-700">Your fee has been paid</span>
+              </div>
+            )}
+
+            {/* Responder Accept/Decline (only after paying fee) */}
+            {trade.is_responder && trade.my_fee_paid && (
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() =>
+                    handleAction(
+                      "accept",
+                      "PATCH",
+                      `trades/${tradeId}/respond/`,
+                      { action: "accept" }
+                    )
+                  }
+                  disabled={actionLoading !== null}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-600 text-white text-sm font-semibold rounded-xl hover:bg-primary-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {actionLoading === "accept" ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <ThumbsUp size={16} />
+                  )}
+                  Accept Trade
+                </button>
+                <button
+                  onClick={() =>
+                    handleAction(
+                      "decline",
+                      "PATCH",
+                      `trades/${tradeId}/respond/`,
+                      { action: "decline" }
+                    )
+                  }
+                  disabled={actionLoading !== null}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-100 border border-red-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {actionLoading === "decline" ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <ThumbsDown size={16} />
+                  )}
+                  Decline Trade
+                </button>
+              </div>
+            )}
+
+            {/* Initiator waiting */}
+            {trade.is_initiator && trade.my_fee_paid && (
+              <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                <Clock size={20} className="text-blue-500" />
+                <div>
+                  <div className="text-sm font-semibold text-blue-800">
+                    Waiting for Response
+                  </div>
+                  <div className="text-xs text-blue-600">
+                    Your trade offer has been sent. Waiting for{" "}
+                    {trade.responder.username} to pay and accept.
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

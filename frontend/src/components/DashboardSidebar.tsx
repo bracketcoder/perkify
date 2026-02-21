@@ -38,6 +38,7 @@ interface UserProfile {
   last_name: string;
   email: string;
   wallet_balance: number;
+  avatar: string | null;
 }
 
 const navSections: NavSection[] = [
@@ -170,9 +171,17 @@ export default function DashboardSidebar() {
       {/* User Info */}
       <div className="p-5 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold text-sm">
-            {getInitials()}
-          </div>
+          {profile?.avatar ? (
+            <img
+              src={profile.avatar}
+              alt="Avatar"
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold text-sm">
+              {getInitials()}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-gray-900 truncate">
               {getDisplayName()}

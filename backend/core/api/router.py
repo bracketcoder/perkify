@@ -11,4 +11,5 @@ urlpatterns = [
     path("", include("core.api.urls.reviews")),
     path("", include("core.api.urls.dashboard")),
     path("", include("core.api.urls.fraud")),
+    path("", include("core.api.urls.payments")),
 ]

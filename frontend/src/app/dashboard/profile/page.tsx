@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   User,
   Mail,
@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { apiCall } from "@/lib/api";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+
 /* ───────── Types ───────── */
 interface ProfileData {
   first_name: string;
@@ -29,6 +31,8 @@ interface ProfileData {
   email: string;
   phone: string;
   location: string;
+  avatar: string | null;
+  has_avatar: boolean;
   is_verified: boolean;
   reputation_score: number;
   total_trades: number;
@@ -80,6 +84,10 @@ export default function ProfilePage() {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
+
+  // Avatar state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -191,6 +199,53 @@ export default function ProfilePage() {
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type and size
+    if (!file.type.startsWith("image/")) {
+      setSaveError("Please select an image file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setSaveError("Image must be smaller than 5MB.");
+      return;
+    }
+
+    setAvatarUploading(true);
+    setSaveError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const token = localStorage.getItem("access_token");
+      const res = await fetch(`${API_BASE}/api/auth/profile/`, {
+        method: "PATCH",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        setSaveError("Failed to upload profile image.");
+      }
+    } catch {
+      setSaveError("Something went wrong uploading your image.");
+    } finally {
+      setAvatarUploading(false);
+      // Reset file input so same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const getInitials = () => {
     const first = firstName?.charAt(0) || "";
     const last = lastName?.charAt(0) || "";
@@ -231,16 +286,52 @@ export default function ProfilePage() {
         </p>
       </div>
 
+      {/* Avatar Required Banner */}
+      {profile && !profile.has_avatar && (
+        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Profile image required</p>
+            <p className="text-sm text-amber-700 mt-0.5">
+              You must upload a profile image before you can trade or purchase gift cards. Click the camera icon below to add one.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Profile Information */}
       <Section title="Personal Information" description="Update your name, phone, and location">
         <div className="flex flex-col sm:flex-row items-start gap-6 mb-6">
           {/* Avatar */}
           <div className="relative">
-            <div className="w-24 h-24 rounded-2xl bg-primary-100 flex items-center justify-center text-primary-600 text-3xl font-bold">
-              {getInitials()}
-            </div>
-            <button className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary-600 text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-primary-700 transition-colors">
-              <Camera size={14} />
+            {profile?.avatar ? (
+              <img
+                src={profile.avatar}
+                alt="Profile"
+                className="w-24 h-24 rounded-2xl object-cover"
+              />
+            ) : (
+              <div className="w-24 h-24 rounded-2xl bg-primary-100 flex items-center justify-center text-primary-600 text-3xl font-bold">
+                {getInitials()}
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={avatarUploading}
+              className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary-600 text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+            >
+              {avatarUploading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Camera size={14} />
+              )}
             </button>
           </div>
           <div className="flex-1">

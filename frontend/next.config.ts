@@ -23,6 +23,10 @@ const nextConfig: NextConfig = {
           source: "/static/:path*",
           destination: `${BACKEND_URL}/static/:path*`,
         },
+        {
+          source: "/media/:path*",
+          destination: `${BACKEND_URL}/media/:path*`,
+        },
       ],
       afterFiles: [],
       fallback: [

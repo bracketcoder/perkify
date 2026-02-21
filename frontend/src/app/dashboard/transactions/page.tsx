@@ -254,14 +254,15 @@ export default function TransactionsPage() {
             ...trades.map((t: Record<string, unknown>) => {
               const ic = t.initiator_card as Record<string, unknown> || {};
               const rc = t.responder_card as Record<string, unknown> || {};
-              const isInitiator = t.initiator === "user" || t.initiator === localStorage.getItem("username");
+              const isInitiator = t.is_initiator === true;
               const otherCard = isInitiator ? rc : ic;
-              const counterparty = isInitiator ? String(t.responder || "Unknown") : String(t.initiator || "Unknown");
+              const cp = t.counterparty as Record<string, unknown> | undefined;
+              const counterparty = cp ? String(cp.username || "Unknown") : (isInitiator ? String(t.responder || "Unknown") : String(t.initiator || "Unknown"));
               return {
                 id: t.trade_id || t.id || "",
                 type: "trade" as const,
-                title: `Swap: ${ic.brand_name || "Card"} ↔ ${rc.brand_name || "Card"}`,
-                brand: String(otherCard.brand_name || "Unknown"),
+                title: `Swap: ${ic.brand || ic.brand_name || "Card"} ↔ ${rc.brand || rc.brand_name || "Card"}`,
+                brand: String(otherCard.brand || otherCard.brand_name || "Unknown"),
                 value: parseFloat(String(ic.value || 0)) + parseFloat(String(rc.value || 0)),
                 amount: "Swap",
                 counterparty_name: counterparty,
@@ -285,8 +286,8 @@ export default function TransactionsPage() {
               return {
                 id: s.sale_id || s.id || "",
                 type: (isBuyer ? "purchase" : "sale") as Transaction["type"],
-                title: `${isBuyer ? "Bought" : "Sold"}: ${gc.brand_name || "Gift Card"}`,
-                brand: String(gc.brand_name || "Unknown"),
+                title: `${isBuyer ? "Bought" : "Sold"}: ${gc.brand || gc.brand_name || "Gift Card"}`,
+                brand: String(gc.brand || gc.brand_name || "Unknown"),
                 value: parseFloat(String(gc.value || 0)),
                 amount: String(parseFloat(String(s.amount || 0)).toFixed(2)),
                 counterparty_name: String(isBuyer ? s.seller : s.buyer) || "Unknown",

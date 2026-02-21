@@ -36,7 +36,8 @@ class TradeListCreateView(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         trade = serializer.save()
         return Response(
-            TradeDetailSerializer(trade).data, status=status.HTTP_201_CREATED
+            TradeDetailSerializer(trade, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
         )
 
     def get_queryset(self):
@@ -115,7 +116,7 @@ class TradeRespondView(APIView):
             trade.status = Trade.Status.CANCELLED
             trade.save(update_fields=["status", "updated_at"])
             return Response(
-                TradeDetailSerializer(trade).data, status=status.HTTP_200_OK
+                TradeDetailSerializer(trade, context={"request": request}).data, status=status.HTTP_200_OK
             )
 
         # action == "accept"
@@ -175,7 +176,7 @@ class TradeRespondView(APIView):
         # Reload with escrow for serialization
         trade.refresh_from_db()
         return Response(
-            TradeDetailSerializer(trade).data, status=status.HTTP_200_OK
+            TradeDetailSerializer(trade, context={"request": request}).data, status=status.HTTP_200_OK
         )
 
 
@@ -211,7 +212,7 @@ class TradeReleaseView(APIView):
 
         trade.refresh_from_db()
         return Response(
-            TradeDetailSerializer(trade).data, status=status.HTTP_200_OK
+            TradeDetailSerializer(trade, context={"request": request}).data, status=status.HTTP_200_OK
         )
 
 
@@ -309,7 +310,7 @@ class TradeConfirmView(APIView):
 
         trade.refresh_from_db()
         return Response(
-            TradeDetailSerializer(trade).data, status=status.HTTP_200_OK
+            TradeDetailSerializer(trade, context={"request": request}).data, status=status.HTTP_200_OK
         )
 
 
@@ -370,5 +371,5 @@ class TradeDisputeView(APIView):
 
         trade.refresh_from_db()
         return Response(
-            TradeDetailSerializer(trade).data, status=status.HTTP_200_OK
+            TradeDetailSerializer(trade, context={"request": request}).data, status=status.HTTP_200_OK
         )
